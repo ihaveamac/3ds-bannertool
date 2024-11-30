@@ -23,6 +23,34 @@ typedef enum {
     RGBA4444
 } PixelFormat;
 
+#ifdef _WIN32
+    #include <stringapiset.h>
+
+    // Based on stbi__fopen
+    static FILE *utf8_fopen(char const *filename, char const *mode)
+    {
+        FILE *f;
+        wchar_t wMode[64];
+        wchar_t wFilename[1024];
+        if (0 == MultiByteToWideChar(65001 /* UTF8 */, 0, filename, -1, wFilename, sizeof(wFilename)/sizeof(*wFilename)))
+            return 0;
+
+        if (0 == MultiByteToWideChar(65001 /* UTF8 */, 0, mode, -1, wMode, sizeof(wMode)/sizeof(*wMode)))
+            return 0;
+
+    #if defined(_MSC_VER) && _MSC_VER >= 1400
+        if (0 != _wfopen_s(&f, wFilename, wMode))
+            f = 0;
+    #else
+        f = _wfopen(wFilename, wMode);
+    #endif
+
+        return f;
+    }
+#else
+    #define utf8_fopen fopen
+#endif
+
 static void utf8_to_utf16(u16* dst, const std::string& src, size_t maxLen) {
     if(maxLen == 0) {
         return;
@@ -40,7 +68,7 @@ static void utf8_to_utf16(u16* dst, const std::string& src, size_t maxLen) {
 }
 
 static void* read_file(u32* size, const std::string& file) {
-    FILE* fd = fopen(file.c_str(), "rb");
+    FILE* fd = utf8_fopen(file.c_str(), "rb");
     if(fd == NULL) {
         perror("ERROR: Could not open file for reading");
         return NULL;
@@ -82,7 +110,7 @@ static void* read_file(u32* size, const std::string& file) {
 }
 
 static bool write_file(void* contents, u32 size, const std::string& file) {
-    FILE* fd = fopen(file.c_str(), "wb");
+    FILE* fd = utf8_fopen(file.c_str(), "wb");
     if(fd == NULL) {
         perror("ERROR: Could not open file for writing");
         return false;
@@ -179,7 +207,7 @@ static void* convert_to_cgfx(u32* size, const std::string& file) {
 }
 
 static void* convert_to_cwav(u32* size, const std::string& file, bool loop, u32 loopStartFrame, u32 loopEndFrame) {
-    FILE* fd = fopen(file.c_str(), "rb");
+    FILE* fd = utf8_fopen(file.c_str(), "rb");
     if(fd == NULL) {
         perror("ERROR: Failed to open file for CWAV conversion");
         return NULL;
